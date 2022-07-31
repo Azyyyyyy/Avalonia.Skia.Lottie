@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using Avalonia.Controls;
@@ -32,6 +32,12 @@ public class Lottie : Control, IAffectsRender
     public const int Infinity = -1;
 
     /// <summary>
+    /// Defines the <see cref="Fps"/> property.
+    /// </summary>
+    public static readonly StyledProperty<double> FpsProperty =
+        AvaloniaProperty.Register<Lottie, double>(nameof(Fps), -1);
+
+    /// <summary>
     /// Defines the <see cref="Path"/> property.
     /// </summary>
     public static readonly StyledProperty<string?> PathProperty =
@@ -60,6 +66,15 @@ public class Lottie : Control, IAffectsRender
     /// <inheritdoc/>
     public event EventHandler? Invalidated;
 
+    /// <summary>
+    /// Gets or sets the Lottie animation framerate
+    /// </summary>
+    public double Fps
+    {
+        get => GetValue(FpsProperty);
+        set => SetValue(FpsProperty, value);
+    }
+    
     /// <summary>
     /// Gets or sets the Lottie animation path.
     /// </summary>
@@ -101,6 +116,17 @@ public class Lottie : Control, IAffectsRender
     {
         AffectsRender<Lottie>(PathProperty, StretchProperty, StretchDirectionProperty);
         AffectsMeasure<Lottie>(PathProperty, StretchProperty, StretchDirectionProperty);
+        FpsProperty.Changed.Subscribe(x =>
+        {
+            if (x.IsEffectiveValueChange)
+            {
+                var lottie = (x.Sender as Lottie);
+                if (lottie?._timer != null)
+                {
+                    lottie._timer.Interval = lottie.GetInterval();
+                }
+            }
+        });
     }
 
     /// <summary>
@@ -311,7 +337,7 @@ public class Lottie : Control, IAffectsRender
 
         _timer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromSeconds(Math.Max(1 / 60.0, 1 / _animation.Fps))
+            Interval = GetInterval()
         };
         _timer.Tick += (_, _) => Tick();
         _timer.Start();
@@ -358,6 +384,8 @@ public class Lottie : Control, IAffectsRender
         _count = 0;
     }
 
+    private TimeSpan GetInterval() => TimeSpan.FromSeconds(Math.Max(1 / 60.0, 1 / (Fps == -1 ? _animation.Fps : Fps)));
+
     private double GetFrameTime()
     {
         if (_animation is null || _timer is null)
@@ -367,7 +395,7 @@ public class Lottie : Control, IAffectsRender
 
         var frameTime = _watch.Elapsed.TotalSeconds;
  
-        if (_watch.Elapsed.TotalSeconds > _animation.Duration)
+        if (_watch.Elapsed.TotalSeconds > _animation.Duration.TotalSeconds)
         {
             _watch.Restart();
             _ic?.End();
@@ -404,7 +432,7 @@ public class Lottie : Control, IAffectsRender
             var t = GetFrameTime();
             if (!_isRunning)
             {
-                t = (float)animation.Duration;
+                t = (float)animation.Duration.TotalSeconds;
             }
 
             var dst = new SKRect(0, 0, animation.Size.Width, animation.Size.Height);
