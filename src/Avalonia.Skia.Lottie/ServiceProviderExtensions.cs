@@ -1,4 +1,3 @@
-using System;
 using Avalonia.Markup.Xaml;
 
 namespace Avalonia.Skia.Lottie;
